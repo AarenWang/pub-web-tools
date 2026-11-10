@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMYK 印刷色彩科学交互可视化实验室</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&display=swap');
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0b0f17;
+            color: #f1f5f9;
+            overflow-x: hidden;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .serif-sc {
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        /* 工业印前控制台玻璃面板 */
+        .console-card {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+        }
+
+        /* 仿真铜版纸/特种纸纹理背景 */
+        .paper-surface {
+            background-color: #fbfaf6;
+            background-image: 
+                radial-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 0),
+                linear-gradient(to right, rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+            background-size: 16px 16px, 32px 32px, 32px 32px;
+            color: #1e293b;
+            box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.06);
+        }
+
+        /* SVG 油墨正片叠底混合模式 */
+        .ink-circle {
+            mix-blend-mode: multiply;
+            cursor: grab;
+            transition: fill 0.2s ease, opacity 0.15s ease;
+        }
+        .ink-circle:active {
+            cursor: grabbing;
+        }
+
+        /* 印刷套准十字线装饰 */
+        .reg-mark {
+            position: relative;
+        }
+
+        /* 定制 CMYK 滑块样式 */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 999px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            transition: transform 0.15s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.18);
+        }
+
+        .slider-c::-webkit-slider-thumb { background: #00AEEF; }
+        .slider-m::-webkit-slider-thumb { background: #EC008C; }
+        .slider-y::-webkit-slider-thumb { background: #eab308; }
+        .slider-k::-webkit-slider-thumb { background: #1e293b; }
+        .slider-indigo::-webkit-slider-thumb { background: #6366f1; }
+
+        /* 印刷四色条装饰 */
+        .cmyk-bar {
+            background: linear-gradient(90deg, #00AEEF 0%, #00AEEF 25%, #EC008C 25%, #EC008C 50%, #FFF200 50%, #FFF200 75%, #111827 75%, #111827 100%);
+        }
+
+        /* 光子流动动画 */
+        @keyframes rayPulse {
+            0%, 100% { stroke-dashoffset: 0; }
+            50% { stroke-dashoffset: 24; }
+        }
+        .light-ray {
+            stroke-dasharray: 6 6;
+            animation: rayPulse 2.5s linear infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen selection:bg-cyan-500 selection:text-slate-950">
+
+    <!-- 顶部四色测控条 -->
+    <div class="w-full h-1.5 cmyk-bar"></div>
+
+    <!-- 全局浮动通知框 -->
+    <div id="toast" class="fixed top-5 right-5 z-50 transform translate-y-[-100px] opacity-0 transition-all duration-300 bg-slate-900/95 border border-slate-700 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-sm">
+        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+        <span id="toast-text">已复制 CMYK 色值</span>
+    </div>
+
+    <!-- Header 印前车间标题栏 -->
+    <header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-7 pb-6 border-b border-slate-800/90">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-700/80 text-xs font-medium text-slate-300 mb-3">
+                    <span class="w-2.5 h-2.5 rounded-sm bg-[#00AEEF]"></span>
+                    <span class="w-2.5 h-2.5 rounded-sm bg-[#EC008C]"></span>
+                    <span class="w-2.5 h-2.5 rounded-sm bg-[#FFF200]"></span>
+                    <span class="w-2.5 h-2.5 rounded-sm bg-white border border-slate-500"></span>
+                    <span class="mono tracking-wider">ISO 12647 / PDF/X PREPRESS LAB</span>
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-white flex flex-wrap items-center gap-3">
+                    <span>CMYK 印刷色彩科学可视化实验室</span>
+                </h1>
+                <p class="text-slate-400 text-sm sm:text-base mt-1.5">
+                    探索减色法油墨叠印、调幅半色调网点（玫瑰斑 vs 撞网莫尔纹）、总墨量（TAC）控制与套印精度
+                </p>
+            </div>
+
+            <!-- 经典印刷配色快速载入 -->
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs text-slate-400 mr-1">行业标准色卡：</span>
+                <button onclick="applyPreset(100,0,0,0, '标准印刷青 Process Cyan')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 transition">100C 青</button>
+                <button onclick="applyPreset(0,100,0,0, '标准印刷品红 Process Magenta')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-pink-500/15 hover:bg-pink-500/30 text-pink-300 border border-pink-500/30 transition">100M 品红</button>
+                <button onclick="applyPreset(0,0,100,0, '标准印刷黄 Process Yellow')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-yellow-500/15 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30 transition">100Y 黄</button>
+                <button onclick="applyPreset(0,95,90,0, '中国红 / 国旗红')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500/15 hover:bg-red-500/30 text-red-300 border border-red-500/30 transition">国旗红</button>
+                <button onclick="applyPreset(60,40,40,100, '标准四色丰富黑 Rich Black')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-700/60 hover:bg-slate-700 text-slate-200 border border-slate-600 transition">四色丰富黑</button>
+                <button onclick="applyPreset(100,100,100,100, '400% 套准线超载黑 Registration')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-rose-950/80 hover:bg-rose-900/70 text-rose-300 border border-rose-500/40 transition">⚠️ 400% 爆墨黑</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主体内容区 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- =========================================================================
+             第一行：SVG 油墨减色叠印实验室 + CMYK 四通道控墨台与总墨量(TAC)预警仪
+             ========================================================================= -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+
+            <!-- 左侧：SVG 纸张油墨正片叠底实验室 (7列) -->
+            <div class="lg:col-span-7 console-card rounded-2xl p-6 flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <span>1. 减色法油墨叠印实验室 (Multiply Overprint)</span>
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                            在白纸基底上直接拖拽 C、M、Y、K 油墨圆斑，观察正片叠底（吸收光线）与真实油墨杂质现象
+                        </p>
+                    </div>
+                    <!-- 切换理想油墨 vs ISO 真实印刷油墨 -->
+                    <div class="inline-flex rounded-xl bg-slate-900 p-1 border border-slate-700/80">
+                        <button id="btnRealInk" onclick="setInkProfile('real')" class="px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-500 text-slate-950 transition">
+                            真实印刷油墨 (ISO Coated)
+                        </button>
+                        <button id="btnIdealInk" onclick="setInkProfile('ideal')" class="px-3 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white transition">
+                            理论纯数学 CMY
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 亮色仿真纸张舞台 -->
+                <div class="relative w-full h-[380px] rounded-xl paper-surface border-2 border-slate-700 overflow-hidden select-none">
+                    <!-- 纸张四角印刷套准线与裁切线 SVG -->
+                    <svg id="inkStageSvg" viewBox="0 0 600 380" class="w-full h-full">
+                        <!-- 印刷裁切线与套准十字标 (Registration Marks) -->
+                        <g stroke="#64748b" stroke-width="1" opacity="0.55">
+                            <!-- 左上角套准标 -->
+                            <circle cx="28" cy="28" r="8" fill="none"/>
+                            <line x1="16" y1="28" x2="40" y2="28"/>
+                            <line x1="28" y1="16" x2="28" y2="40"/>
+                            <!-- 右上角套准标 -->
+                            <circle cx="572" cy="28" r="8" fill="none"/>
+                            <line x1="560" y1="28" x2="584" y2="28"/>
+                            <line x1="572" y1="16" x2="572" y2="40"/>
+                            <!-- 左下角套准标 -->
+                            <circle cx="28" cy="352" r="8" fill="none"/>
+                            <line x1="16" y1="352" x2="40" y2="352"/>
+                            <line x1="28" y1="340" x2="28" y2="364"/>
+                            <!-- 右下角套准标 -->
+                            <circle cx="572" cy="352" r="8" fill="none"/>
+                            <line x1="560" y1="352" x2="584" y2="352"/>
+                            <line x1="572" y1="340" x2="572" y2="364"/>
+                        </g>
+
+                        <!-- 顶部纸张反射率提示 -->
+                        <text x="55" y="32" fill="#475569" font-size="11" font-family="JetBrains Mono" font-weight="600">
+                            PAPER SUBSTRATE: 100% 白光反射基底 (RGB: 251, 250, 246)
+                        </text>
+
+                        <!-- 油墨叠印隔离层：mix-blend-mode: multiply -->
+                        <g style="isolation: isolate;">
+                            <!-- 青色油墨版 Cyan -->
+                            <circle id="inkCircleC" class="ink-circle" cx="245" cy="145" r="95" fill="#00AEEF" opacity="1"/>
+                            <!-- 品红油墨版 Magenta -->
+                            <circle id="inkCircleM" class="ink-circle" cx="355" cy="145" r="95" fill="#EC008C" opacity="1"/>
+                            <!-- 黄色油墨版 Yellow -->
+                            <circle id="inkCircleY" class="ink-circle" cx="300" cy="240" r="95" fill="#FFF200" opacity="1"/>
+                            <!-- 黑色主版 Key Plate (可开关) -->
+                            <circle id="inkCircleK" class="ink-circle" cx="300" cy="177" r="46" fill="#141413" opacity="0.85" style="display: none;"/>
+                        </g>
+
+                        <!-- 油墨圆斑标签与交集说明 -->
+                        <g id="inkLabelC" transform="translate(175, 90)" class="pointer-events-none">
+                            <rect x="-42" y="-14" width="84" height="20" rx="4" fill="rgba(255,255,255,0.85)"/>
+                            <text text-anchor="middle" y="0" fill="#0369a1" font-size="12" font-weight="700">C 青墨 (-红光)</text>
+                        </g>
+                        <g id="inkLabelM" transform="translate(425, 90)" class="pointer-events-none">
+                            <rect x="-48" y="-14" width="96" height="20" rx="4" fill="rgba(255,255,255,0.85)"/>
+                            <text text-anchor="middle" y="0" fill="#be185d" font-size="12" font-weight="700">M 品红墨 (-绿光)</text>
+                        </g>
+                        <g id="inkLabelY" transform="translate(300, 322)" class="pointer-events-none">
+                            <rect x="-44" y="-14" width="88" height="20" rx="4" fill="rgba(255,255,255,0.85)"/>
+                            <text text-anchor="middle" y="0" fill="#a16207" font-size="12" font-weight="700">Y 黄墨 (-蓝光)</text>
+                        </g>
+                    </svg>
+
+                    <!-- 纸张左下角：K黑版叠加开关 -->
+                    <div class="absolute bottom-3 left-3 flex items-center gap-2 bg-slate-900/90 backdrop-blur text-white px-3 py-2 rounded-xl border border-slate-700 shadow-lg">
+                        <input id="toggleKPlate" type="checkbox" onchange="toggleCenterKPlate()" class="w-4 h-4 accent-cyan-400 rounded cursor-pointer">
+                        <label for="toggleKPlate" class="text-xs font-medium cursor-pointer select-none">
+                            在中心叠印 <span class="text-amber-300 font-bold">K (黑版主版)</span> 对比纯度
+                        </label>
+                    </div>
+
+                    <!-- 纸张右下角：为什么需要 K 的科学注解 -->
+                    <div id="inkExplanationBadge" class="absolute bottom-3 right-3 max-w-[275px] bg-white/95 backdrop-blur border border-slate-300 text-slate-800 px-3 py-2 rounded-xl shadow-md text-[11px] leading-snug">
+                        <span class="font-bold text-rose-600">为什么需要 K？</span> 真实 C+M+Y 油墨存在化学杂质，100% 叠印只能得到<span class="font-semibold underline decoration-amber-600">深泥褐色 (#2B2625)</span>，必须加入 K 碳黑油墨才能压暗细节并节省昂贵彩墨。
+                    </div>
+                </div>
+
+                <!-- 底部操作栏与复位 -->
+                <div class="flex flex-wrap items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-800/80 text-xs text-slate-400">
+                    <span>💡 提示：两两交集生成二次色：<b>C+Y=绿(G)</b>、<b>C+M=蓝(B)</b>、<b>M+Y=红(R)</b></span>
+                    <button onclick="resetInkCircles()" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+                        重置油墨圆斑位置
+                    </button>
+                </div>
+            </div>
+
+            <!-- 右侧：四色油墨通道控墨台与总墨量(TAC)预警仪 (5列) -->
+            <div class="lg:col-span-5 console-card rounded-2xl p-6 flex flex-col justify-between space-y-5">
+                <div class="flex items-start justify-between gap-2">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">印前四色控墨台 & TAC 监测仪</h3>
+                        <p class="text-xs text-slate-400">调节下方 C/M/Y/K 网点百分比，实时驱动全页所有模拟器</p>
+                    </div>
+                    <button onclick="copyCmykString()" class="px-2.5 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-medium transition">
+                        复制色值
+                    </button>
+                </div>
+
+                <!-- 印刷打样色块对比预览 (纸张模拟效果 vs 屏幕 HEX) -->
+                <div class="grid grid-cols-12 gap-3 p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 items-center">
+                    <div class="col-span-5 flex items-center gap-3">
+                        <div id="cmykSwatchBox" class="w-16 h-16 rounded-xl shadow-inner border-2 border-white/20 shrink-0 transition-colors duration-75" style="background-color: #0095D9;"></div>
+                        <div>
+                            <div class="text-[11px] text-slate-400">模拟印刷油墨</div>
+                            <div id="cmykHexDisplay" class="mono text-base font-bold text-white mt-0.5">#0095D9</div>
+                            <div id="presetNameTag" class="text-[11px] text-cyan-400 font-medium truncate max-w-[110px]">自定义油墨配比</div>
+                        </div>
+                    </div>
+                    <div class="col-span-7 border-l border-slate-800 pl-3.5 space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">标准印刷标识:</span>
+                            <span id="cmykCodeText" class="mono font-bold text-cyan-300">C100 M0 Y0 K0</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">屏幕等效 RGB:</span>
+                            <span id="rgbEquivText" class="mono text-slate-300">rgb(0, 149, 217)</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">白纸光线反射率:</span>
+                            <span id="reflectanceText" class="mono text-emerald-400">48% 反射</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- C M Y K 四通道百分比滑块 -->
+                <div class="space-y-3.5 bg-slate-900/60 p-4 rounded-xl border border-slate-800/90">
+                    <!-- Cyan -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-semibold text-[#00AEEF] flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-[#00AEEF]"></span>C 青色油墨版 (Cyan - 吸收红光)
+                            </span>
+                            <span id="valC" class="mono font-bold text-white">70%</span>
+                        </div>
+                        <input id="inputC" type="range" min="0" max="100" value="70" class="w-full bg-slate-800 slider-c" oninput="onCmykSliderChange()">
+                    </div>
+
+                    <!-- Magenta -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-semibold text-[#EC008C] flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-[#EC008C]"></span>M 品红油墨版 (Magenta - 吸收绿光)
+                            </span>
+                            <span id="valM" class="mono font-bold text-white">15%</span>
+                        </div>
+                        <input id="inputM" type="range" min="0" max="100" value="15" class="w-full bg-slate-800 slider-m" oninput="onCmykSliderChange()">
+                    </div>
+
+                    <!-- Yellow -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-semibold text-[#FFF200] flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-[#FFF200]"></span>Y 黄色油墨版 (Yellow - 吸收蓝光)
+                            </span>
+                            <span id="valY" class="mono font-bold text-white">0%</span>
+                        </div>
+                        <input id="inputY" type="range" min="0" max="100" value="0" class="w-full bg-slate-800 slider-y" oninput="onCmykSliderChange()">
+                    </div>
+
+                    <!-- Key Black -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-semibold text-slate-200 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-white border border-slate-400"></span>K 黑色主版 (Key Plate - 轮廓与暗部)
+                            </span>
+                            <span id="valK" class="mono font-bold text-white">0%</span>
+                        </div>
+                        <input id="inputK" type="range" min="0" max="100" value="0" class="w-full bg-slate-800 slider-k" oninput="onCmykSliderChange()">
+                    </div>
+                </div>
+
+                <!-- 总墨量 (TAC / Total Ink Coverage) 预警仪表盘 -->
+                <div class="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-xs font-bold text-white uppercase tracking-wider">总墨量 TAC (Total Area Coverage)</span>
+                            <p class="text-[11px] text-slate-400">C + M + Y + K 四版油墨总和上限监控</p>
+                        </div>
+                        <div class="text-right">
+                            <span id="tacValueText" class="mono text-xl font-bold text-emerald-400">85%</span>
+                            <span class="text-xs text-slate-500"> / 400%</span>
+                        </div>
+                    </div>
+
+                    <!-- 刻度进度条 -->
+                    <div class="relative w-full h-3 bg-slate-800 rounded-full overflow-hidden">
+                        <div id="tacProgressBar" class="h-full bg-emerald-500 transition-all duration-150 rounded-full" style="width: 21.25%"></div>
+                        <!-- 240% 新闻纸警戒线与 300% 铜版纸警戒线 -->
+                        <div class="absolute top-0 bottom-0 left-[60%] w-0.5 bg-amber-400/80" title="240% 胶版纸/新闻纸上限"></div>
+                        <div class="absolute top-0 bottom-0 left-[75%] w-0.5 bg-rose-500" title="300% 铜版纸印刷上限"></div>
+                    </div>
+
+                    <div class="flex justify-between text-[10px] mono text-slate-400">
+                        <span>0%</span>
+                        <span class="text-amber-400/90">▲240% 胶版纸上限</span>
+                        <span class="text-rose-400">▲300% 铜版纸红线</span>
+                        <span>400%</span>
+                    </div>
+
+                    <div id="tacStatusBanner" class="px-3 py-2 rounded-lg bg-emerald-950/50 border border-emerald-500/30 text-xs text-emerald-300 flex items-center justify-between">
+                        <span>✅ 油墨总量安全：干燥迅速，无背面粘脏风险</span>
+                        <span class="mono text-[11px]">PDF/X 合格</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================================================
+             第二行：半色调网点 (Halftone Rosette) 放大镜 + 单黑 vs 四色黑 & 套印不准模拟器
+             ========================================================================= -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+
+            <!-- 模块 2：交互式半色调网点与玫瑰斑/莫尔纹模拟器 (6列) -->
+            <div class="lg:col-span-6 console-card rounded-2xl p-6 flex flex-col justify-between">
+                <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
+                    <div>
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <span>2. 半色调加网与玫瑰斑放大镜 (Halftone Rosette)</span>
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                            印刷机无法直接印出深浅浓淡，而是靠不同大小与角度的 C/M/Y/K 网点错位排列欺骗人眼
+                        </p>
+                    </div>
+                    <div class="flex gap-1.5">
+                        <button onclick="setStandardScreenAngles()" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition">
+                            标准防撞网角度
+                        </button>
+                        <button onclick="triggerMoireAccident()" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 transition">
+                            ⚡ 制造撞网/莫尔纹事故
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Canvas 放大镜视窗 -->
+                <div class="relative w-full h-[290px] rounded-xl paper-surface border-2 border-slate-700 overflow-hidden flex items-center justify-center">
+                    <canvas id="halftoneCanvas" width="560" height="290" class="w-full h-full block"></canvas>
+
+                    <!-- 左上角放大镜状态浮层 -->
+                    <div class="absolute top-3 left-3 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-700 text-xs flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                        <span id="rosetteStatusText" class="text-slate-200 font-medium">标准 30° 错位玫瑰斑 (Rosette)</span>
+                    </div>
+
+                    <!-- 右下角实时色样对照 -->
+                    <div class="absolute bottom-3 right-3 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-2">
+                        <span class="text-[11px] text-slate-400">人眼远观合成色:</span>
+                        <div id="halftoneMacroPreview" class="w-5 h-5 rounded border border-white/30" style="background:#0095D9"></div>
+                    </div>
+                </div>
+
+                <!-- 加网角度微调与网点倍率控制 -->
+                <div class="mt-4 space-y-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                    <!-- 网点放大倍率滑块 -->
+                    <div class="flex items-center gap-3 pb-2 border-b border-slate-800">
+                        <span class="text-xs font-semibold text-indigo-300 w-28 shrink-0">🔍 放大镜倍率:</span>
+                        <span class="text-[11px] text-slate-400">远观融合</span>
+                        <input id="dotPitchSlider" type="range" min="4" max="28" value="16" class="flex-1 bg-slate-800 slider-indigo" oninput="renderHalftoneSimulation()">
+                        <span class="text-[11px] text-slate-400">50x 微距网点</span>
+                    </div>
+
+                    <!-- 四色加网角度控制 -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                        <div class="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="flex justify-between text-[11px] mb-1">
+                                <span class="text-[#00AEEF] font-bold">C 青网角</span>
+                                <span id="angleTextC" class="mono text-white">15°</span>
+                            </div>
+                            <input id="angleSliderC" type="range" min="0" max="90" value="15" class="w-full bg-slate-800 slider-c" oninput="renderHalftoneSimulation()">
+                        </div>
+                        <div class="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="flex justify-between text-[11px] mb-1">
+                                <span class="text-[#EC008C] font-bold">M 品红网角</span>
+                                <span id="angleTextM" class="mono text-white">75°</span>
+                            </div>
+                            <input id="angleSliderM" type="range" min="0" max="90" value="75" class="w-full bg-slate-800 slider-m" oninput="renderHalftoneSimulation()">
+                        </div>
+                        <div class="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="flex justify-between text-[11px] mb-1">
+                                <span class="text-[#FFF200] font-bold">Y 黄网角</span>
+                                <span id="angleTextY" class="mono text-white">0°</span>
+                            </div>
+                            <input id="angleSliderY" type="range" min="0" max="90" value="0" class="w-full bg-slate-800 slider-y" oninput="renderHalftoneSimulation()">
+                        </div>
+                        <div class="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="flex justify-between text-[11px] mb-1">
+                                <span class="text-slate-300 font-bold">K 黑网角</span>
+                                <span id="angleTextK" class="mono text-white">45°</span>
+                            </div>
+                            <input id="angleSliderK" type="range" min="0" max="90" value="45" class="w-full bg-slate-800 slider-k" oninput="renderHalftoneSimulation()">
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                        📌 <b>加网黄金法则：</b>人眼对 45° 斜线最不敏感，因此将视觉对比最强的 <b>K（或主色）置于 45°</b>，<b>C(15°)</b> 与 <b>M(75°)</b> 各错开 30°，最弱的 <b>Y 置于 0°</b>，从而形成均匀美观的“玫瑰斑”。
+                    </p>
+                </div>
+            </div>
+
+            <!-- 模块 3：单黑(100K) vs 四色黑(Rich Black) & 套印不准模拟器 (6列) -->
+            <div class="lg:col-span-6 console-card rounded-2xl p-6 flex flex-col justify-between">
+                <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">3. 单黑 vs 四色丰富黑 & 套印不准模拟</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                            为什么正文小字严禁用四色黑？大面积色块又为什么不能只用单黑？拖动下方套印偏差滑块亲眼验证
+                        </p>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
+                        印前防坑指南
+                    </span>
+                </div>
+
+                <!-- 纸张对比视窗：左单黑 vs 右四色黑 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-1">
+                    <!-- 左侧：单黑 100K -->
+                    <div class="paper-surface rounded-xl p-4 border-2 border-slate-700 flex flex-col justify-between">
+                        <div class="flex items-center justify-between border-b border-slate-300 pb-2 mb-3">
+                            <span class="text-xs font-bold text-slate-800">A. 单色黑 (C0 M0 Y0 K100)</span>
+                            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">正文小字首选</span>
+                        </div>
+
+                        <!-- 大色块表现：偏灰暗淡 -->
+                        <div class="w-full h-20 rounded-lg bg-[#282726] flex flex-col items-center justify-center text-white p-2 shadow-inner">
+                            <span class="text-xs font-semibold text-stone-300">大面积单黑实地色块</span>
+                            <span class="text-[10px] text-stone-400 mt-0.5">单层黑墨略显发灰、不够深邃</span>
+                        </div>
+
+                        <!-- 细小衬线文字表现：永远锐利 -->
+                        <div class="mt-4 pt-3 border-t border-slate-200 relative overflow-hidden">
+                            <div class="text-[11px] text-slate-500 mb-1">6pt 极细印刷内文预览 (仅单次压印)：</div>
+                            <p class="serif-sc text-lg font-bold text-[#181818] tracking-wide select-none">
+                                印刷品边缘锐利清晰 Typography
+                            </p>
+                            <p class="text-xs text-[#222] mt-1 leading-snug">
+                                无论四色印版如何偏移，单黑文字因为只经过 K 版一次压印，绝不会出现彩边重影。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 右侧：四色丰富黑 Rich Black -->
+                    <div class="paper-surface rounded-xl p-4 border-2 border-slate-700 flex flex-col justify-between">
+                        <div class="flex items-center justify-between border-b border-slate-300 pb-2 mb-3">
+                            <span class="text-xs font-bold text-slate-800">B. 四色丰富黑 (C60 M40 Y40 K100)</span>
+                            <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold">大面积背景首选</span>
+                        </div>
+
+                        <!-- 大色块表现：深邃浓郁 -->
+                        <div class="w-full h-20 rounded-lg bg-[#08090c] flex flex-col items-center justify-center text-white p-2 shadow-inner">
+                            <span class="text-xs font-semibold text-white">大面积四色丰富黑色块</span>
+                            <span class="text-[10px] text-cyan-300/80 mt-0.5">底层垫入青品黄，黑度饱满深邃</span>
+                        </div>
+
+                        <!-- 细小文字套印不准重影演示区 -->
+                        <div class="mt-4 pt-3 border-t border-slate-200 relative overflow-hidden">
+                            <div class="text-[11px] text-slate-500 mb-1">6pt 细小文字四色叠印预览 (受套准影响)：</div>
+                            <div class="relative h-7">
+                                <p id="misregC" class="serif-sc text-lg font-bold text-[#00AEEF] tracking-wide absolute top-0 left-0 select-none" style="mix-blend-mode:multiply;">
+                                    印刷品边缘锐利清晰 Typography
+                                </p>
+                                <p id="misregM" class="serif-sc text-lg font-bold text-[#EC008C] tracking-wide absolute top-0 left-0 select-none" style="mix-blend-mode:multiply;">
+                                    印刷品边缘锐利清晰 Typography
+                                </p>
+                                <p id="misregY" class="serif-sc text-lg font-bold text-[#eab308] tracking-wide absolute top-0 left-0 select-none" style="mix-blend-mode:multiply;">
+                                    印刷品边缘锐利清晰 Typography
+                                </p>
+                                <p id="misregK" class="serif-sc text-lg font-bold text-[#181818] tracking-wide absolute top-0 left-0 select-none" style="mix-blend-mode:multiply;">
+                                    印刷品边缘锐利清晰 Typography
+                                </p>
+                            </div>
+                            <p id="misregWarningText" class="text-xs text-rose-600 font-medium mt-1 leading-snug">
+                                ⚠️ 印版发生微米级偏移时，文字四周立刻露出青色与品红毛边！
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 套印不准偏移模拟器滑块 -->
+                <div class="mt-3 bg-slate-900/70 p-4 rounded-xl border border-slate-800 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-amber-300 flex items-center gap-2">
+                            <span>⚙️ 模拟印刷机套印偏差 (Misregistration):</span>
+                        </span>
+                        <span id="misregValDisplay" class="mono text-xs font-bold text-white bg-slate-800 px-2.5 py-0.5 rounded border border-slate-700">
+                            偏移 1.8 px (轻微套印不准)
+                        </span>
+                    </div>
+                    <input id="misregSlider" type="range" min="0" max="4.5" step="0.1" value="1.8" class="w-full bg-slate-800 slider-indigo" oninput="updateMisregistration(this.value)">
+                    <div class="flex justify-between text-[11px] text-slate-400">
+                        <span>0.0 px (理想完美套准)</span>
+                        <span>1.5 px (常见纸张伸缩偏差)</span>
+                        <span>4.5 px (严重套印事故)</span>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- =========================================================================
+             第三行：纸张光谱吸收物理图解 (SVG) + RGB 超色域 (Out-of-Gamut) 压缩对比器
+             ========================================================================= -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+
+            <!-- 模块 4：SVG 动态光谱滤光与纸张反射物理图解 (7列) -->
+            <div class="lg:col-span-7 console-card rounded-2xl p-6 flex flex-col justify-between">
+                <div class="mb-3">
+                    <h2 class="text-xl font-bold text-white">4. 减色法物理本质：油墨滤光与纸张反射路径</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        油墨本身不发光！白光（含 R、G、B 全光谱）穿透透明油墨层到达白纸再反射回人眼，实时观察当前 CMYK 配比吃掉了哪些光
+                    </p>
+                </div>
+
+                <div class="w-full rounded-xl bg-slate-950 border border-slate-800 p-3 overflow-hidden">
+                    <svg viewBox="0 0 650 240" class="w-full h-auto">
+                        <!-- 1. 入射白光光源 -->
+                        <g transform="translate(30, 20)">
+                            <rect x="0" y="0" width="125" height="34" rx="8" fill="#1e293b" stroke="#475569"/>
+                            <text x="62" y="21" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">☀️ 入射自然白光</text>
+                        </g>
+
+                        <!-- 入射 R, G, B 三原色光束 -->
+                        <g stroke-width="4" fill="none">
+                            <line x1="85" y1="56" x2="245" y2="175" stroke="#ef4444" class="light-ray"/>
+                            <line x1="105" y1="56" x2="275" y2="175" stroke="#22c55e" class="light-ray"/>
+                            <line x1="125" y1="56" x2="305" y2="175" stroke="#3b82f6" class="light-ray"/>
+                        </g>
+                        <text x="115" y="115" fill="#94a3b8" font-size="11">100% R+G+B 入射</text>
+
+                        <!-- 2. 油墨涂层与白纸基底横截面 -->
+                        <!-- 纸张基层 -->
+                        <rect x="150" y="195" width="350" height="28" rx="4" fill="#f8fafc" stroke="#cbd5e1"/>
+                        <text x="325" y="213" text-anchor="middle" fill="#334155" font-size="12" font-weight="700">
+                            📄 白色铜版纸基底 (漫反射剩余光子)
+                        </text>
+
+                        <!-- Y 黄墨层 -->
+                        <rect id="layerRectY" x="175" y="177" width="300" height="16" rx="2" fill="#FFF200" opacity="0.2"/>
+                        <text x="485" y="189" fill="#fde047" font-size="10" font-family="JetBrains Mono">Y 黄墨层 (-B)</text>
+
+                        <!-- M 品红墨层 -->
+                        <rect id="layerRectM" x="175" y="159" width="300" height="16" rx="2" fill="#EC008C" opacity="0.3"/>
+                        <text x="485" y="171" fill="#f472b6" font-size="10" font-family="JetBrains Mono">M 品红层 (-G)</text>
+
+                        <!-- C 青墨层 -->
+                        <rect id="layerRectC" x="175" y="141" width="300" height="16" rx="2" fill="#00AEEF" opacity="0.8"/>
+                        <text x="485" y="153" fill="#38bdf8" font-size="10" font-family="JetBrains Mono">C 青墨层 (-R)</text>
+
+                        <!-- K 黑墨层 -->
+                        <rect id="layerRectK" x="175" y="123" width="300" height="16" rx="2" fill="#0f172a" opacity="0"/>
+                        <text x="485" y="135" fill="#94a3b8" font-size="10" font-family="JetBrains Mono">K 黑墨层 (-RGB)</text>
+
+                        <!-- 3. 反射回人眼的剩余光谱 -->
+                        <g fill="none">
+                            <line id="reflectRayR" x1="255" y1="175" x2="435" y2="52" stroke="#ef4444" stroke-width="4" class="light-ray"/>
+                            <line id="reflectRayG" x1="285" y1="175" x2="455" y2="52" stroke="#22c55e" stroke-width="4" class="light-ray"/>
+                            <line id="reflectRayB" x1="315" y1="175" x2="475" y2="52" stroke="#3b82f6" stroke-width="4" class="light-ray"/>
+                        </g>
+
+                        <!-- 4. 人眼感知结果 -->
+                        <g transform="translate(420, 14)">
+                            <rect x="0" y="0" width="195" height="42" rx="8" fill="#1e293b" stroke="#475569"/>
+                            <circle id="eyePerceivedCircle" cx="24" cy="21" r="12" fill="#0095D9" stroke="#ffffff" stroke-width="1.5"/>
+                            <text x="45" y="18" fill="#e2e8f0" font-size="11" font-weight="700">👁️ 人眼接收反射光</text>
+                            <text id="eyeRaySummary" x="45" y="33" fill="#94a3b8" font-size="10" font-family="JetBrains Mono">R:0% G:58% B:85%</text>
+                        </g>
+                    </svg>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3 mt-3 text-xs">
+                    <div class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                        <span class="text-[#00AEEF] font-bold">青墨 (C)</span> 专吃 <span class="text-red-400 font-semibold">红光 (R)</span>
+                        <div id="absorbStatR" class="mono text-[11px] text-slate-400 mt-0.5">当前吸收: 70% 红光</div>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                        <span class="text-[#EC008C] font-bold">品红 (M)</span> 专吃 <span class="text-green-400 font-semibold">绿光 (G)</span>
+                        <div id="absorbStatG" class="mono text-[11px] text-slate-400 mt-0.5">当前吸收: 15% 绿光</div>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                        <span class="text-[#FFF200] font-bold">黄墨 (Y)</span> 专吃 <span class="text-blue-400 font-semibold">蓝光 (B)</span>
+                        <div id="absorbStatB" class="mono text-[11px] text-slate-400 mt-0.5">当前吸收: 0% 蓝光</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模块 5：RGB 转 CMYK 超色域 (Out of Gamut) 预警体验器 (5列) -->
+            <div class="lg:col-span-5 console-card rounded-2xl p-6 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xl font-bold text-white">5. 屏幕 RGB 超色域压缩模拟</h2>
+                        <span class="px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-medium">
+                            为什么印出来变暗了？
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">
+                        点击下方高饱和屏幕 RGB 颜色，直观对比显示器发光色彩与 CMYK 油墨能还原的极限色差
+                    </p>
+                </div>
+
+                <!-- 典型超色域颜色快捷体验按钮 -->
+                <div class="grid grid-cols-2 gap-2 my-3">
+                    <button onclick="testGamutColor(0, 255, 102, '赛博荧光绿 Neon Green')" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 flex items-center gap-2 text-left transition">
+                        <span class="w-6 h-6 rounded-md shrink-0" style="background:#00FF66"></span>
+                        <div class="min-w-0">
+                            <div class="text-xs font-bold text-white truncate">荧光绿 #00FF66</div>
+                            <div class="text-[10px] text-rose-400">严重超色域 ⚠️</div>
+                        </div>
+                    </button>
+                    <button onclick="testGamutColor(30, 80, 255, 'RGB 屏幕高亮皇家蓝')" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 flex items-center gap-2 text-left transition">
+                        <span class="w-6 h-6 rounded-md shrink-0" style="background:#1E50FF"></span>
+                        <div class="min-w-0">
+                            <div class="text-xs font-bold text-white truncate">电光蓝 #1E50FF</div>
+                            <div class="text-[10px] text-rose-400">严重超色域 ⚠️</div>
+                        </div>
+                    </button>
+                    <button onclick="testGamutColor(255, 0, 220, '荧光洋红 Hot Pink')" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 flex items-center gap-2 text-left transition">
+                        <span class="w-6 h-6 rounded-md shrink-0" style="background:#FF00DC"></span>
+                        <div class="min-w-0">
+                            <div class="text-xs font-bold text-white truncate">荧光粉 #FF00DC</div>
+                            <div class="text-[10px] text-rose-400">中度超色域 ⚠️</div>
+                        </div>
+                    </button>
+                    <button onclick="testGamutColor(195, 45, 55, '古典砖红 Brick Red')" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 flex items-center gap-2 text-left transition">
+                        <span class="w-6 h-6 rounded-md shrink-0" style="background:#C32D37"></span>
+                        <div class="min-w-0">
+                            <div class="text-xs font-bold text-white truncate">古典红 #C32D37</div>
+                            <div class="text-[10px] text-emerald-400">CMYK 安全色域 ✓</div>
+                        </div>
+                    </button>
+                </div>
+
+                <!-- 左右视觉落差对比大色块 -->
+                <div class="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-900 border border-slate-800">
+                    <div class="space-y-2 text-center">
+                        <div class="text-xs font-semibold text-slate-300">🖥️ 屏幕 sRGB 发光效果</div>
+                        <div id="gamutRgbBox" class="w-full h-24 rounded-xl border border-white/20 shadow-lg flex items-end justify-center p-2" style="background:#00FF66">
+                            <span id="gamutRgbHex" class="px-2 py-0.5 rounded bg-black/65 text-white mono text-xs">#00FF66</span>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-center">
+                        <div class="text-xs font-semibold text-slate-300">🖨️ CMYK 四色油墨实印</div>
+                        <div id="gamutCmykBox" class="w-full h-24 rounded-xl border border-white/20 shadow-inner flex items-end justify-center p-2" style="background:#38A86B">
+                            <span id="gamutCmykText" class="px-2 py-0.5 rounded bg-black/65 text-cyan-200 mono text-xs">C72 M0 Y78 K0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 色差原因分析 -->
+                <div id="gamutAlertBox" class="mt-3 p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-200 leading-relaxed">
+                    ⚠️ <b>超色域警告 (Out of Gamut)：</b>纸张油墨无法主动发光，该高亮颜色在转为 CMYK 时亮度与饱和度被强制压缩。若需印出荧光色，必须在印厂额外指定 <b>Pantone 专色油墨（Spot Color）</b>。
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <script>
+        /* ==============================================================
+         * 1. 核心色彩转换引擎：ISO Coated 真实印刷油墨仿真 vs 理论数学转换
+         * ============================================================== */
+        let inkProfile = 'real'; // 'real' | 'ideal'
+
+        // ISO 12647-2 铜版纸四色油墨基准 RGB 顶点（模拟真实油墨反射率与深褐三色黑）
+        const ISO_PALETTE = {
+            white:   [251, 250, 246], // 纸白
+            cyan:    [0, 168, 232],   // 100C
+            magenta: [228, 0, 127],   // 100M
+            yellow:  [255, 238, 0],   // 100Y
+            red:     [222, 32, 27],   // M + Y
+            green:   [0, 152, 74],    // C + Y
+            blue:    [42, 42, 134],   // C + M
+            cmyBlack:[45, 38, 36],    // 100C + 100M + 100Y 真实油墨混合出的深泥褐色
+            kBlack:  [26, 25, 24]     // 100K 单黑油墨
+        };
+
+        // 使用三线性插值模拟真实 ISO 印刷油墨叠印色彩
+        function cmykToRealRgb(c, m, y, k) {
+            const C = c / 100, M = m / 100, Y = y / 100, K = k / 100;
+
+            if (inkProfile === 'ideal') {
+                return {
+                    r: Math.round(255 * (1 - C) * (1 - K)),
+                    g: Math.round(255 * (1 - M) * (1 - K)),
+                    b: Math.round(255 * (1 - Y) * (1 - K))
+                };
+            }
+
+            // 三线性插值计算 C, M, Y 在纸张上的混合
+            const c000 = ISO_PALETTE.white;
+            const c100 = ISO_PALETTE.cyan;
+            const c010 = ISO_PALETTE.magenta;
+            const c001 = ISO_PALETTE.yellow;
+            const c110 = ISO_PALETTE.blue;
+            const c101 = ISO_PALETTE.green;
+            const c011 = ISO_PALETTE.red;
+            const c111 = ISO_PALETTE.cmyBlack;
+
+            const rgb = [0, 0, 0];
+            for (let i = 0; i < 3; i++) {
+                const cmyVal =
+                    c000[i] * (1 - C) * (1 - M) * (1 - Y) +
+                    c100[i] * C * (1 - M) * (1 - Y) +
+                    c010[i] * (1 - C) * M * (1 - Y) +
+                    c001[i] * (1 - C) * (1 - M) * Y +
+                    c110[i] * C * M * (1 - Y) +
+                    c101[i] * C * (1 - M) * Y +
+                    c011[i] * (1 - C) * M * Y +
+                    c111[i] * C * M * Y;
+
+                // 叠加 K 版油墨（单黑 100% 保留约 10% 微弱漫反射，叠在深色上则逼近纯黑）
+                const kFactor = 1 - K * 0.90;
+                rgb[i] = Math.round(Math.max(6, cmyVal * kFactor - K * 8));
+            }
+            return { r: rgb[0], g: rgb[1], b: rgb[2] };
+        }
+
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, '0')).join('').toUpperCase();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-text').textContent = msg;
+            toast.classList.remove('translate-y-[-100px]', 'opacity-0');
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => {
+                toast.classList.add('translate-y-[-100px]', 'opacity-0');
+            }, 2200);
+        }
+
+        function copyCmykString() {
+            const text = document.getElementById('cmykCodeText').textContent;
+            const temp = document.createElement('textarea');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast(`已复制印刷色值：${text}`);
+        }
+
+        /* ==============================================================
+         * 2. 模块 1：SVG 油墨圆斑拖拽 & 理想/真实油墨切换
+         * ============================================================== */
+        const inkStageSvg = document.getElementById('inkStageSvg');
+        const inkNodes = {
+            C: { el: document.getElementById('inkCircleC'), label: document.getElementById('inkLabelC'), cx: 245, cy: 145, lx: -70, ly: -55 },
+            M: { el: document.getElementById('inkCircleM'), label: document.getElementById('inkLabelM'), cx: 355, cy: 145, lx: 70,  ly: -55 },
+            Y: { el: document.getElementById('inkCircleY'), label: document.getElementById('inkLabelY'), cx: 300, cy: 240, lx: 0,   ly: 82 }
+        };
+
+        let draggingInkKey = null;
+
+        function updateInkCirclePositions() {
+            ['C', 'M', 'Y'].forEach(k => {
+                const item = inkNodes[k];
+                item.el.setAttribute('cx', item.cx);
+                item.el.setAttribute('cy', item.cy);
+                item.label.setAttribute('transform', `translate(${item.cx + item.lx}, ${item.cy + item.ly})`);
+            });
+            // K 版始终跟随三圆几何中心
+            const centerX = (inkNodes.C.cx + inkNodes.M.cx + inkNodes.Y.cx) / 3;
+            const centerY = (inkNodes.C.cy + inkNodes.M.cy + inkNodes.Y.cy) / 3;
+            const kCircle = document.getElementById('inkCircleK');
+            kCircle.setAttribute('cx', centerX);
+            kCircle.setAttribute('cy', centerY);
+        }
+
+        function resetInkCircles() {
+            inkNodes.C.cx = 245; inkNodes.C.cy = 145;
+            inkNodes.M.cx = 355; inkNodes.M.cy = 145;
+            inkNodes.Y.cx = 300; inkNodes.Y.cy = 240;
+            updateInkCirclePositions();
+        }
+
+        function setInkProfile(mode) {
+            inkProfile = mode;
+            const btnReal = document.getElementById('btnRealInk');
+            const btnIdeal = document.getElementById('btnIdealInk');
+            const badge = document.getElementById('inkExplanationBadge');
+
+            if (mode === 'real') {
+                btnReal.className = 'px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-500 text-slate-950 transition';
+                btnIdeal.className = 'px-3 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white transition';
+                inkNodes.C.el.setAttribute('fill', '#00AEEF');
+                inkNodes.M.el.setAttribute('fill', '#EC008C');
+                inkNodes.Y.el.setAttribute('fill', '#FFF200');
+                badge.innerHTML = `<span class="font-bold text-rose-600">为什么需要 K？</span> 真实 C+M+Y 油墨存在化学杂质，100% 叠印只能得到<span class="font-semibold underline decoration-amber-600">深泥褐色</span>，必须加入 K 碳黑油墨才能压暗细节并节省昂贵彩墨。`;
+            } else {
+                btnIdeal.className = 'px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-500 text-slate-950 transition';
+                btnReal.className = 'px-3 py-1 rounded-lg text-xs font-medium text-slate-300 hover:text-white transition';
+                inkNodes.C.el.setAttribute('fill', '#00FFFF');
+                inkNodes.M.el.setAttribute('fill', '#FF00FF');
+                inkNodes.Y.el.setAttribute('fill', '#FFFF00');
+                badge.innerHTML = `<span class="font-bold text-indigo-600">理论数学模式：</span> 假设油墨是 100% 完美滤光器，C(#00FFFF) + M(#FF00FF) + Y(#FFFF00) 正片叠底在数学上等于纯黑 (0,0,0)，但这在现实化学颜料中无法实现。`;
+            }
+            onCmykSliderChange();
+        }
+
+        function toggleCenterKPlate() {
+            const checked = document.getElementById('toggleKPlate').checked;
+            document.getElementById('inkCircleK').style.display = checked ? 'block' : 'none';
+        }
+
+        ['C', 'M', 'Y'].forEach(key => {
+            const el = inkNodes[key].el;
+            el.addEventListener('mousedown', (e) => { draggingInkKey = key; e.stopPropagation(); });
+            el.addEventListener('touchstart', (e) => { draggingInkKey = key; e.stopPropagation(); e.preventDefault(); }, { passive: false });
+        });
+
+        function handleInkStageMove(e) {
+            if (!draggingInkKey) return;
+            const rect = inkStageSvg.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const x = Math.max(85, Math.min(515, (clientX - rect.left) * (600 / rect.width)));
+            const y = Math.max(85, Math.min(295, (clientY - rect.top) * (380 / rect.height)));
+            inkNodes[draggingInkKey].cx = x;
+            inkNodes[draggingInkKey].cy = y;
+            updateInkCirclePositions();
+        }
+
+        window.addEventListener('mousemove', handleInkStageMove);
+        window.addEventListener('touchmove', (e) => { if (draggingInkKey) { handleInkStageMove(e); e.preventDefault(); } }, { passive: false });
+        window.addEventListener('mouseup', () => { draggingInkKey = null; });
+        window.addEventListener('touchend', () => { draggingInkKey = null; });
+
+        /* ==============================================================
+         * 3. 四通道控墨台、TAC 总墨量预警 & 光谱吸收路径联动
+         * ============================================================== */
+        function applyPreset(c, m, y, k, label) {
+            document.getElementById('inputC').value = c;
+            document.getElementById('inputM').value = m;
+            document.getElementById('inputY').value = y;
+            document.getElementById('inputK').value = k;
+            document.getElementById('presetNameTag').textContent = label || '自定义油墨配比';
+            onCmykSliderChange(true);
+        }
+
+        function onCmykSliderChange(keepLabel) {
+            const c = parseInt(document.getElementById('inputC').value, 10);
+            const m = parseInt(document.getElementById('inputM').value, 10);
+            const y = parseInt(document.getElementById('inputY').value, 10);
+            const k = parseInt(document.getElementById('inputK').value, 10);
+
+            if (!keepLabel) {
+                document.getElementById('presetNameTag').textContent = '自定义油墨配比';
+            }
+
+            document.getElementById('valC').textContent = `${c}%`;
+            document.getElementById('valM').textContent = `${m}%`;
+            document.getElementById('valY').textContent = `${y}%`;
+            document.getElementById('valK').textContent = `${k}%`;
+
+            // 同步 SVG 油墨圆斑透明度（最低保留 0.12 以便还能看见并拖动圆斑）
+            inkNodes.C.el.style.opacity = Math.max(0.12, c / 100);
+            inkNodes.M.el.style.opacity = Math.max(0.12, m / 100);
+            inkNodes.Y.el.style.opacity = Math.max(0.12, y / 100);
+
+            // 计算合成 RGB 与 HEX
+            const { r, g, b } = cmykToRealRgb(c, m, y, k);
+            const hex = rgbToHex(r, g, b);
+
+            document.getElementById('cmykSwatchBox').style.backgroundColor = hex;
+            document.getElementById('cmykHexDisplay').textContent = hex;
+            document.getElementById('cmykCodeText').textContent = `C${c} M${m} Y${y} K${k}`;
+            document.getElementById('rgbEquivText').textContent = `rgb(${r}, ${g}, ${b})`;
+            document.getElementById('halftoneMacroPreview').style.backgroundColor = hex;
+
+            // 计算纸张相对反射率
+            const reflectance = Math.round(((r * 0.299 + g * 0.587 + b * 0.114) / 255) * 100);
+            document.getElementById('reflectanceText').textContent = `${reflectance}% 反射`;
+
+            // 更新 TAC 总墨量仪表盘
+            const tac = c + m + y + k;
+            const tacText = document.getElementById('tacValueText');
+            const tacBar = document.getElementById('tacProgressBar');
+            const tacBanner = document.getElementById('tacStatusBanner');
+
+            tacText.textContent = `${tac}%`;
+            tacBar.style.width = `${(tac / 400) * 100}%`;
+
+            if (tac <= 240) {
+                tacText.className = 'mono text-xl font-bold text-emerald-400';
+                tacBar.className = 'h-full bg-emerald-500 transition-all duration-150 rounded-full';
+                tacBanner.className = 'px-3 py-2 rounded-lg bg-emerald-950/50 border border-emerald-500/30 text-xs text-emerald-300 flex items-center justify-between';
+                tacBanner.innerHTML = `<span>✅ 油墨总量安全：适用于新闻纸、胶版纸与铜版纸</span><span class="mono text-[11px]">PDF/X 合格</span>`;
+            } else if (tac <= 300) {
+                tacText.className = 'mono text-xl font-bold text-amber-400';
+                tacBar.className = 'h-full bg-amber-400 transition-all duration-150 rounded-full';
+                tacBanner.className = 'px-3 py-2 rounded-lg bg-amber-950/50 border border-amber-500/30 text-xs text-amber-200 flex items-center justify-between';
+                tacBanner.innerHTML = `<span>⚠️ 中高墨量区：仅限铜版纸印刷，胶版纸易透印</span><span class="mono text-[11px]">建议 UCR/GCR</span>`;
+            } else {
+                tacText.className = 'mono text-xl font-bold text-rose-400';
+                tacBar.className = 'h-full bg-rose-500 transition-all duration-150 rounded-full';
+                tacBanner.className = 'px-3 py-2 rounded-lg bg-rose-950/60 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between';
+                tacBanner.innerHTML = `<span>🚨 爆墨危险 (>300%)：油墨无法干燥，会导致印张背面粘脏与蹭脏！</span><span class="mono text-[11px] font-bold">印前拦截</span>`;
+            }
+
+            // 更新模块 4：SVG 光谱吸收与反射图
+            document.getElementById('layerRectC').setAttribute('opacity', (c / 100) * 0.9);
+            document.getElementById('layerRectM').setAttribute('opacity', (m / 100) * 0.9);
+            document.getElementById('layerRectY').setAttribute('opacity', (y / 100) * 0.9);
+            document.getElementById('layerRectK').setAttribute('opacity', (k / 100) * 0.92);
+
+            const remR = Math.round((r / 255) * 100);
+            const remG = Math.round((g / 255) * 100);
+            const remB = Math.round((b / 255) * 100);
+
+            document.getElementById('reflectRayR').setAttribute('opacity', Math.max(0.08, remR / 100));
+            document.getElementById('reflectRayG').setAttribute('opacity', Math.max(0.08, remG / 100));
+            document.getElementById('reflectRayB').setAttribute('opacity', Math.max(0.08, remB / 100));
+
+            document.getElementById('reflectRayR').setAttribute('stroke-width', Math.max(1, (remR / 100) * 4.5));
+            document.getElementById('reflectRayG').setAttribute('stroke-width', Math.max(1, (remG / 100) * 4.5));
+            document.getElementById('reflectRayB').setAttribute('stroke-width', Math.max(1, (remB / 100) * 4.5));
+
+            document.getElementById('eyePerceivedCircle').setAttribute('fill', hex);
+            document.getElementById('eyeRaySummary').textContent = `剩余反射 R:${remR}% G:${remG}% B:${remB}%`;
+
+            document.getElementById('absorbStatR').textContent = `C墨 + K墨 共吸收: ${100 - remR}% 红光`;
+            document.getElementById('absorbStatG').textContent = `M墨 + K墨 共吸收: ${100 - remG}% 绿光`;
+            document.getElementById('absorbStatB').textContent = `Y墨 + K墨 共吸收: ${100 - remB}% 蓝光`;
+
+            // 同步重绘半色调网点模拟器
+            renderHalftoneSimulation();
+        }
+
+        /* ==============================================================
+         * 4. 模块 2：Canvas 半色调网点 (Halftone Rosette) 与撞网模拟器
+         * ============================================================== */
+        const htCanvas = document.getElementById('halftoneCanvas');
+        const htCtx = htCanvas.getContext('2d');
+
+        function setStandardScreenAngles() {
+            document.getElementById('angleSliderC').value = 15;
+            document.getElementById('angleSliderM').value = 75;
+            document.getElementById('angleSliderY').value = 0;
+            document.getElementById('angleSliderK').value = 45;
+            document.getElementById('rosetteStatusText').textContent = '✅ 标准 30° 错位玫瑰斑 (Rosette)';
+            document.getElementById('rosetteStatusText').className = 'text-emerald-300 font-medium';
+            renderHalftoneSimulation();
+        }
+
+        function triggerMoireAccident() {
+            // 将青版与品红版、黑版角度设为极其接近（如 15°, 19°, 12°, 17°），立刻产生强烈莫尔条纹
+            if (parseInt(document.getElementById('inputM').value, 10) < 35) {
+                document.getElementById('inputC').value = 65;
+                document.getElementById('inputM').value = 65;
+                document.getElementById('inputY').value = 20;
+                onCmykSliderChange();
+            }
+            document.getElementById('angleSliderC').value = 15;
+            document.getElementById('angleSliderM').value = 20;
+            document.getElementById('angleSliderY').value = 12;
+            document.getElementById('angleSliderK').value = 18;
+            document.getElementById('rosetteStatusText').textContent = '⚠️ 撞网事故：网角过近产生明显莫尔纹 (Moiré)';
+            document.getElementById('rosetteStatusText').className = 'text-rose-400 font-semibold';
+            renderHalftoneSimulation();
+        }
+
+        function renderHalftoneSimulation() {
+            const w = htCanvas.width;
+            const h = htCanvas.height;
+
+            const cPct = parseInt(document.getElementById('inputC').value, 10) / 100;
+            const mPct = parseInt(document.getElementById('inputM').value, 10) / 100;
+            const yPct = parseInt(document.getElementById('inputY').value, 10) / 100;
+            const kPct = parseInt(document.getElementById('inputK').value, 10) / 100;
+
+            const angC = parseInt(document.getElementById('angleSliderC').value, 10);
+            const angM = parseInt(document.getElementById('angleSliderM').value, 10);
+            const angY = parseInt(document.getElementById('angleSliderY').value, 10);
+            const angK = parseInt(document.getElementById('angleSliderK').value, 10);
+
+            document.getElementById('angleTextC').textContent = `${angC}°`;
+            document.getElementById('angleTextM').textContent = `${angM}°`;
+            document.getElementById('angleTextY').textContent = `${angY}°`;
+            document.getElementById('angleTextK').textContent = `${angK}°`;
+
+            const pitch = parseInt(document.getElementById('dotPitchSlider').value, 10);
+
+            // 清空为仿真铜版纸底色
+            htCtx.save();
+            htCtx.globalCompositeOperation = 'source-over';
+            htCtx.fillStyle = '#fbfaf6';
+            htCtx.fillRect(0, 0, w, h);
+
+            // 使用 multiply 混合模式绘制四层旋转半色调网点阵列
+            htCtx.globalCompositeOperation = 'multiply';
+
+            const channels = [
+                { pct: yPct, angle: angY, color: inkProfile === 'real' ? '#FFF200' : '#FFFF00' },
+                { pct: cPct, angle: angC, color: inkProfile === 'real' ? '#00AEEF' : '#00FFFF' },
+                { pct: mPct, angle: angM, color: inkProfile === 'real' ? '#EC008C' : '#FF00FF' },
+                { pct: kPct, angle: angK, color: '#1b1918' }
+            ];
+
+            const diag = Math.sqrt(w * w + h * h) / 2 + pitch * 2;
+
+            channels.forEach(ch => {
+                if (ch.pct <= 0.005) return;
+                // 网点半径与覆盖率的平方根成正比（当 pct 接近 100% 时网点相互交叠填满）
+                const radius = Math.sqrt(ch.pct / Math.PI) * pitch * 1.16;
+
+                htCtx.save();
+                htCtx.translate(w / 2, h / 2);
+                htCtx.rotate((ch.angle * Math.PI) / 180);
+                htCtx.fillStyle = ch.color;
+
+                htCtx.beginPath();
+                for (let gx = -diag; gx <= diag; gx += pitch) {
+                    for (let gy = -diag; gy <= diag; gy += pitch) {
+                        htCtx.moveTo(gx + radius, gy);
+                        htCtx.arc(gx, gy, radius, 0, Math.PI * 2);
+                    }
+                }
+                htCtx.fill();
+                htCtx.restore();
+            });
+
+            htCtx.restore();
+        }
+
+        /* ==============================================================
+         * 5. 模块 3：单黑 vs 四色黑 套印不准 (Misregistration) 模拟器
+         * ============================================================== */
+        function updateMisregistration(offsetVal) {
+            const d = parseFloat(offsetVal);
+            const display = document.getElementById('misregValDisplay');
+            const warn = document.getElementById('misregWarningText');
+
+            if (d === 0) {
+                display.textContent = '偏移 0.0 px (理想实验室套准)';
+                warn.textContent = '✅ 理想零偏差状态，但高速印刷机纸张受湿度膨胀几乎不可能绝对为 0。';
+                warn.className = 'text-xs text-emerald-700 font-medium mt-1 leading-snug';
+            } else if (d < 2.2) {
+                display.textContent = `偏移 ${d.toFixed(1)} px (常见微米级套印偏差)`;
+                warn.textContent = '⚠️ 印版发生轻微偏移时，四色黑细小文字四周立刻露出青色与品红毛边！';
+                warn.className = 'text-xs text-amber-700 font-medium mt-1 leading-snug';
+            } else {
+                display.textContent = `偏移 ${d.toFixed(1)} px (严重套印事故)`;
+                warn.textContent = '🚨 严重重影！四色黑小字已完全糊成彩边，而左侧单黑 (100K) 文字依然锐利。';
+                warn.className = 'text-xs text-rose-600 font-bold mt-1 leading-snug';
+            }
+
+            // 分别向不同方向偏移 C, M, Y 层
+            document.getElementById('misregC').style.transform = `translate(${-d}px, ${-d * 0.6}px)`;
+            document.getElementById('misregM').style.transform = `translate(${d}px, ${-d * 0.5}px)`;
+            document.getElementById('misregY').style.transform = `translate(${0}px, ${d}px)`;
+        }
+
+        /* ==============================================================
+         * 6. 模块 5：RGB 超色域 (Out-of-Gamut) 压缩对比器
+         * ============================================================== */
+        function testGamutColor(r, g, b, title) {
+            const rgbHex = rgbToHex(r, g, b);
+            document.getElementById('gamutRgbBox').style.backgroundColor = rgbHex;
+            document.getElementById('gamutRgbHex').textContent = `${rgbHex}`;
+
+            // 标准 RGB -> CMYK 转换公式 + UCR 底色去除限制
+            const rN = r / 255, gN = g / 255, bN = b / 255;
+            const kRaw = 1 - Math.max(rN, gN, bN);
+            let c = 0, m = 0, y = 0, k = Math.round(kRaw * 100);
+
+            if (kRaw < 1) {
+                c = Math.round(((1 - rN - kRaw) / (1 - kRaw)) * 100);
+                m = Math.round(((1 - gN - kRaw) / (1 - kRaw)) * 100);
+                y = Math.round(((1 - bN - kRaw) / (1 - kRaw)) * 100);
+            }
+
+            // 获取真实 ISO 油墨能够呈现的颜色
+            const prevProfile = inkProfile;
+            inkProfile = 'real';
+            const printedRgb = cmykToRealRgb(c, m, y, k);
+            inkProfile = prevProfile;
+
+            const printedHex = rgbToHex(printedRgb.r, printedRgb.g, printedRgb.b);
+            document.getElementById('gamutCmykBox').style.backgroundColor = printedHex;
+            document.getElementById('gamutCmykText').textContent = `C${c} M${m} Y${y} K${k}`;
+
+            // 计算欧氏色差 Delta
+            const delta = Math.round(Math.sqrt(
+                Math.pow(r - printedRgb.r, 2) +
+                Math.pow(g - printedRgb.g, 2) +
+                Math.pow(b - printedRgb.b, 2)
+            ));
+
+            const alertBox = document.getElementById('gamutAlertBox');
+            if (delta > 55) {
+                alertBox.className = 'mt-3 p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-200 leading-relaxed';
+                alertBox.innerHTML = `⚠️ <b>严重超色域 (${title})：</b>油墨靠反射光线成像，无法达到屏幕背光灯的高纯度（色差 Δ≈${delta}）。直接四色印刷会明显变暗变灰，需改用 <b>Pantone 专色油墨</b>。`;
+            } else {
+                alertBox.className = 'mt-3 p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-200 leading-relaxed';
+                alertBox.innerHTML = `✅ <b>安全色域内 (${title})：</b>该色彩位于 ISO Coated 四色油墨色域范围内（色差 Δ≈${delta}），屏幕预览与实际印刷成品高度一致。`;
+            }
+        }
+
+        /* ==============================================================
+         * 初始化启动
+         * ============================================================== */
+        window.onload = function () {
+            onCmykSliderChange(true);
+            updateMisregistration(1.8);
+            testGamutColor(0, 255, 102, '赛博荧光绿 Neon Green');
+        };
+    </script>
+</body>
+</html>
